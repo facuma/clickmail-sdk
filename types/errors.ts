@@ -1,0 +1,31 @@
+export type ErrorCode =
+  | "UNAUTHORIZED"
+  | "FORBIDDEN"
+  | "RATE_LIMIT_EXCEEDED"
+  | "QUOTA_EXCEEDED"
+  | "PLAN_REQUIRES_UPGRADE"
+  | "SANDBOX_RECIPIENT_NOT_VERIFIED"
+  | "DOMAIN_NOT_VERIFIED"
+  | "EMAIL_SUPPRESSED"
+  | "INVALID_SENDER"
+  | "PROJECT_SUSPENDED"
+  | "PROJECT_DISABLED"
+  | "PROJECT_NOT_FOUND"
+  | "BROADCASTING_NOT_ALLOWED"
+  | "HIGH_BOUNCE_RATE"
+  | "HIGH_COMPLAINT_RATE"
+  | "SANDBOX_BROADCAST_BLOCKED"
+  | "DOMAIN_LIMIT_EXCEEDED"
+  | "API_KEY_LIMIT_EXCEEDED"
+  | "SENDER_NOT_ALLOWED"
+  | "TEMPLATE_NOT_FOUND"
+  | "VALIDATION_ERROR"
+  | (string & Record<never, never>);
+
+export interface ApiErrorBody {
+  error: {
+    code: ErrorCode;
+    message: string;
+    details?: Record<string, unknown>;
+  };
+}

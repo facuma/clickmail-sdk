@@ -1,0 +1,14 @@
+src
+types
+tests
+examples
+.github
+.env
+.env.*
+coverage
+tsconfig.json
+tsup.config.ts
+vitest.config.ts
+*.tsbuildinfo
+CONTRIBUTING.md
+CHANGELOG.md
