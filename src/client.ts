@@ -194,7 +194,7 @@ export class ClickMail {
 
     const headers: Record<string, string> = {
       Authorization: `Bearer ${this.apiKey}`,
-      "Content-Type": "application/json",
+      "Content-Type": "application/json; charset=utf-8",
       "User-Agent": userAgent,
     };
 
