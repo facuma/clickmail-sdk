@@ -58,7 +58,7 @@ describe("ClickMail constructor", () => {
       RequestInit
     ];
     const headers = init.headers as Record<string, string>;
-    expect(headers["User-Agent"]).toMatch(/^clickmail-sdk\/0\.3\.0/);
+    expect(headers["User-Agent"]).toMatch(/^clickmail-sdk\/0\.3\.1/);
   });
 
   it("envía Authorization header correcto", async () => {

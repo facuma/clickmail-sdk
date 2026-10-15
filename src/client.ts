@@ -1,5 +1,4 @@
-import type { ApiErrorBody } from "../types/errors.js";
-import { parseApiError, ClickMailError, ValidationError } from "./errors.js";
+import { errorFromResponse, ClickMailError, ValidationError } from "./errors.js";
 import { EmailsResource } from "./resources/emails.js";
 import { DomainsResource } from "./resources/domains.js";
 import { SendersResource } from "./resources/senders.js";
@@ -13,7 +12,7 @@ import { InboundResource } from "./resources/inbound.js";
 const DEFAULT_BASE_URL = "https://resendapi.cubells.com.ar";
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_RETRIES = 2;
-const SDK_VERSION = "0.3.0";
+const SDK_VERSION = "0.3.1";
 
 const RETRY_STATUS_CODES = new Set([429, 500, 502, 503, 504]);
 const NO_RETRY_STATUS_CODES = new Set([400, 401, 403, 404, 422]);
@@ -116,7 +115,7 @@ export class ClickMail {
         const response = await this.fetchImpl(url, fetchInit);
 
         clearTimeout(timer);
-        return await this.handleResponse<T>(response, attempt);
+        return await this.handleResponse<T>(response);
       } catch (err) {
         clearTimeout(timer);
 
@@ -155,7 +154,7 @@ export class ClickMail {
     throw lastError;
   }
 
-  private async handleResponse<T>(response: Response, attempt: number): Promise<T> {
+  private async handleResponse<T>(response: Response): Promise<T> {
     if (response.ok) {
       if (response.status === 204) {
         return undefined as unknown as T;
@@ -165,20 +164,7 @@ export class ClickMail {
     }
 
     const json = await safeJson(response);
-
-    if (isApiErrorBody(json)) {
-      const error = parseApiError(response.status, json);
-      if (RETRY_STATUS_CODES.has(response.status) && attempt < this.retries) {
-        throw error;
-      }
-      throw error;
-    }
-
-    throw new ClickMailError(
-      `HTTP ${response.status}: ${response.statusText}`,
-      response.status,
-      "API_ERROR"
-    );
+    throw errorFromResponse(response.status, response.statusText, json);
   }
 
   private buildUrl(
@@ -227,13 +213,4 @@ async function safeJson(response: Response): Promise<unknown> {
   } catch {
     return null;
   }
-}
-
-function isApiErrorBody(value: unknown): value is ApiErrorBody {
-  return (
-    value !== null &&
-    typeof value === "object" &&
-    "error" in value &&
-    typeof (value as { error: unknown }).error === "object"
-  );
 }

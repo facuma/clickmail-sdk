@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-10-15
+
+### Fixed
+
+- Typed errors are now thrown against the live API. The SDK only recognized
+  `{ error: { code, message } }` bodies, but the API answers with a top-level
+  `{ code, message }` (business errors) or NestJS's default
+  `{ statusCode, message, error }`, so every failure surfaced as a generic
+  `ClickMailError` with code `API_ERROR` (e.g. a bad API key was not an
+  `AuthenticationError`). All three shapes are now mapped.
+- Without a recognized `code`, the error class comes from the HTTP status:
+  401 → `AuthenticationError`, 403 → `PermissionError`, 429 → `RateLimitError`,
+  400/422 → `ValidationError`; anything else is an `ApiError`.
+- Typed errors keep the real HTTP `statusCode` instead of a fixed one (e.g.
+  `QuotaExceededError` from a 400 now reports 400 and is no longer retried as
+  if it were a 429).
+- Validation errors with a list of messages are joined into `message` and the
+  list is available in `details.messages`.
+
 ## [0.3.0] - 2026-10-15
 
 Version aligned with the ClickMail monorepo SDK (there is no 0.2.0 release here).

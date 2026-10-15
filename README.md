@@ -329,7 +329,7 @@ await client.suppressions.delete("sup_abc");
 
 ## Error Handling
 
-All errors extend `ClickMailError` and include `statusCode`, `code`, and `message`.
+All errors extend `ClickMailError` and include `statusCode` (the HTTP status of the response), `code`, and `message`. The class is chosen from the API's error `code` when it is a known one, otherwise from the HTTP status; anything unrecognized is an `ApiError` with the code returned by the API (or `API_ERROR`).
 
 ```typescript
 import {
@@ -363,7 +363,7 @@ try {
   } else if (err instanceof SuppressedRecipientError) {
     // Recipient is on the suppression list
   } else if (err instanceof ValidationError) {
-    // 400 — invalid payload
+    // 400/422 — invalid payload (details.messages lists each problem when available)
   } else if (err instanceof ClickMailError) {
     console.error(`[${err.code}] ${err.message}`);
   }
