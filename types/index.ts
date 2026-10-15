@@ -8,3 +8,4 @@ export type * from "./templates.js";
 export type * from "./campaigns.js";
 export type * from "./contacts.js";
 export type * from "./suppressions.js";
+export type * from "./inbound.js";

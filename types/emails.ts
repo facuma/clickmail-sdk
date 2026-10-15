@@ -22,6 +22,7 @@ export interface SendEmailPayload {
   templateId?: string;
   variables?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
+  /** Defaults to a random key per call, so automatic retries never send twice. */
   idempotencyKey?: string;
 }
 

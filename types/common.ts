@@ -14,5 +14,9 @@ export interface PaginationParams {
 }
 
 export interface RequestOptions {
+  /**
+   * Sent as `Idempotency-Key`. `emails.send` and `inbound.reply` generate a
+   * random one when omitted, so automatic retries never send twice.
+   */
   idempotencyKey?: string;
 }

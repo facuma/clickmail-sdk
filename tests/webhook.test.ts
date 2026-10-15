@@ -71,7 +71,9 @@ describe("constructWebhookEvent", () => {
 
     expect(event.type).toBe("email.delivered");
     expect(event.project_id).toBe("proj_abc");
-    expect(event.data.email_id).toBe("em_abc");
+    if (event.type === "email.delivered") {
+      expect(event.data.email_id).toBe("em_abc");
+    }
   });
 
   it("lanza ClickMailError si la firma es inválida", () => {
@@ -106,3 +108,56 @@ describe("constructWebhookEvent", () => {
     ).toThrow(ClickMailError);
   });
 });
+
+describe("webhooks 0.3.0", () => {
+  const received = {
+    id: "evt_1",
+    type: "email.received",
+    project_id: "proj_abc",
+    timestamp: new Date().toISOString(),
+    data: {
+      id: "ie_1",
+      subject: "Hola",
+      attachments: [{ id: "att_1", stored: true, download_url: "/v1/inbound/ie_1/attachments/att_1" }],
+    },
+  };
+
+  it("lee la firma de los headers y devuelve un email.received tipado", () => {
+    const payload = JSON.stringify(received);
+    const event = constructWebhookEvent({
+      payload: Buffer.from(payload, "utf8"),
+      secret: SECRET,
+      headers: { "x-webhook-signature": makeSignature(payload, SECRET), "x-webhook-id": "evt_1" },
+    });
+
+    expect(event.id).toBe("evt_1");
+    expect(event.type).toBe("email.received");
+    if (event.type === "email.received") {
+      expect(event.data.attachments[0]?.stored).toBe(true);
+    }
+  });
+
+  it("acepta un objeto Headers de fetch", () => {
+    const payload = JSON.stringify(received);
+    const headers = new Headers({ "X-Webhook-Signature": makeSignature(payload, SECRET) });
+    expect(verifyWebhookSignature({ payload, secret: SECRET, headers })).toBe(true);
+  });
+
+  it("devuelve false si no hay firma ni headers", () => {
+    expect(verifyWebhookSignature({ payload: PAYLOAD, secret: SECRET })).toBe(false);
+  });
+
+  it("rechaza eventos fuera de la tolerancia de tiempo", () => {
+    const old = { ...received, timestamp: new Date(Date.now() - 10 * 60 * 1000).toISOString() };
+    const payload = JSON.stringify(old);
+    const signature = makeSignature(payload, SECRET);
+
+    expect(() =>
+      constructWebhookEvent({ payload, signature, secret: SECRET, toleranceSeconds: 300 })
+    ).toThrow(ClickMailError);
+    expect(
+      constructWebhookEvent({ payload, signature, secret: SECRET, toleranceSeconds: 3600 }).id
+    ).toBe("evt_1");
+  });
+});
+

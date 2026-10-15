@@ -67,7 +67,7 @@ const client = new ClickMail({
 | `apiKey` | `string` | required | Your ClickMail API key (`ck_live_...` or `ck_test_...`) |
 | `baseUrl` | `string` | `https://resendapi.cubells.com.ar` | API base URL |
 | `timeoutMs` | `number` | `30000` | Request timeout in milliseconds |
-| `retries` | `number` | `2` | Retries for 429/5xx responses |
+| `retries` | `number` | `2` | Retries for 429/5xx responses (see [Retries and idempotency](#retries-and-idempotency)) |
 | `fetch` | `typeof fetch` | `globalThis.fetch` | Custom fetch implementation |
 
 ---
@@ -104,6 +104,10 @@ await client.emails.send({
 ```
 
 ### With idempotency key (safe to retry)
+
+`send()` always sends an `Idempotency-Key` — a random one unless you pass your own — so
+the SDK's automatic retries can never send the same email twice. Pass a stable key when
+*your* code may retry the call (e.g. a job that can run twice):
 
 ```typescript
 await client.emails.send({
@@ -172,11 +176,12 @@ await client.webhooks.delete(webhook.id);
 import { constructWebhookEvent } from "@clickmail/sdk/webhook";
 
 const event = constructWebhookEvent({
-  payload: rawBody,           // string | Buffer | Uint8Array
-  signature: req.headers["x-webhook-signature"],
+  payload: rawBody,           // string | Buffer | Uint8Array — the raw body
+  headers: req.headers,       // reads X-Webhook-Signature (or pass `signature`)
   secret: process.env.CLICKMAIL_WEBHOOK_SECRET,
 });
 
+// Delivery is at-least-once: de-duplicate on event.id (stable across retries).
 switch (event.type) {
   case "email.delivered":
     await markEmailDelivered(event.data.email_id);
@@ -184,10 +189,24 @@ switch (event.type) {
   case "email.bounced":
     await handleBounce(event.data.recipients);
     break;
-  case "email.complained":
-    await addToSuppression(event.data.recipients[0]);
+  case "email.received":
+    await saveInboundEmail(event.data.id, event.data.from.email, event.data.subject);
     break;
 }
+```
+
+`event` is a discriminated union: narrow it by `event.type` before reading `event.data`.
+Pass `toleranceSeconds` to reject events with an old timestamp (retries keep the original
+timestamp and span ~2 hours, so use a window that covers them).
+
+### Delivery log
+
+Failed deliveries are retried with exponential backoff for ~2 hours. Inspect and resend them:
+
+```typescript
+const { data } = await client.webhooks.deliveries.list({ status: "FAILED" });
+const delivery = await client.webhooks.deliveries.get(data[0].id); // payload + last response
+await client.webhooks.deliveries.redeliver(delivery.id);           // same event id
 ```
 
 ### Available webhook events
@@ -201,9 +220,40 @@ switch (event.type) {
 | `email.failed` | Sending failed |
 | `email.opened` | Email opened (if tracking enabled) |
 | `email.clicked` | Link clicked |
-| `project.suspended` | Project was suspended |
-| `usage.quota_exceeded` | Monthly quota reached |
-| `abuse.signal_created` | Abuse signal detected |
+| `email.received` | Email received on an inbound address |
+| `project.suspended` | Reserved — not emitted yet |
+| `usage.quota_exceeded` | Reserved — not emitted yet |
+| `abuse.signal_created` | Reserved — not emitted yet |
+
+---
+
+## Inbound (receiving email)
+
+Requires an API key with `inbound:read`, plus `inbound:write` to reply.
+
+```typescript
+const { data } = await client.inbound.list({ status: "PROCESSED", limit: 20 });
+const email = await client.inbound.get(data[0].id);
+
+// Attachments and the raw MIME are served through short-lived presigned URLs
+const { url } = await client.inbound.getAttachment(email.id, email.attachments[0].id);
+const raw = await client.inbound.getRaw(email.id);
+
+// Reply: goes to the original Reply-To/From and threads with it
+await client.inbound.reply(email.id, {
+  from: "Support <support@yourdomain.com>",
+  text: "Thanks, we are on it.",
+});
+```
+
+---
+
+## Retries and idempotency
+
+- `GET`, `PATCH` and `DELETE` are retried on 429/5xx and timeouts with exponential backoff.
+- `POST` requests are retried on 5xx/timeouts only when they carry an `Idempotency-Key`
+  (`emails.send` and `inbound.reply` always do). Other `POST`s retry only on 429, which is
+  rejected before anything happens.
 
 ---
 

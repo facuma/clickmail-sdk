@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-10-15
+
+Version aligned with the ClickMail monorepo SDK (there is no 0.2.0 release here).
+
+### Added
+
+- `client.inbound`: `list`, `get`, `getRaw`, `getAttachment` and `reply` for received
+  emails (API key scopes `inbound:read` / `inbound:write`). Replies thread with the
+  original message (In-Reply-To / References).
+- `client.webhooks.deliveries`: `list`, `get` and `redeliver` for the webhook delivery log.
+- `email.received` webhook event, with typed `EmailReceivedData` (attachments with
+  `stored` / `download_url`, `in_reply_to`, `references`, SPF/DKIM/DMARC verdicts).
+- Webhook envelopes expose the event `id` (stable across retries — de-duplicate on it).
+- `constructWebhookEvent` / `verifyWebhookSignature` accept `headers` (Node or fetch
+  `Headers`) to read `X-Webhook-Signature`, and an optional `toleranceSeconds` check
+  on the event timestamp. `signature` is now optional when `headers` is given.
+- `ClickMailError` is re-exported from `@clickmail/sdk/webhook`.
+- Example `examples/node/inbound.ts`.
+
+### Changed
+
+- `emails.send` and `inbound.reply` always send an `Idempotency-Key` (random unless
+  you pass one), so automatic retries can never send twice.
+- Other `POST` requests are no longer retried on 5xx or timeouts (only on 429), since
+  repeating them could duplicate the action. `GET`/`PATCH`/`DELETE` retry as before.
+- **Types:** `WebhookEventPayload` is now a discriminated union. Code that reads
+  `event.data.email_id` must first narrow with `event.type` (e.g. in a `switch`).
+
+### Fixed
+
+- `examples/node/verify-webhook.ts` imported `ClickMailError` from the webhook subpath,
+  which did not export it.
+
 ## [0.1.0] - 2024-01-01
 
 ### Added

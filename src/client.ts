@@ -8,11 +8,12 @@ import { TemplatesResource } from "./resources/templates.js";
 import { CampaignsResource } from "./resources/campaigns.js";
 import { ContactsResource } from "./resources/contacts.js";
 import { SuppressionsResource } from "./resources/suppressions.js";
+import { InboundResource } from "./resources/inbound.js";
 
 const DEFAULT_BASE_URL = "https://resendapi.cubells.com.ar";
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_RETRIES = 2;
-const SDK_VERSION = "0.1.0";
+const SDK_VERSION = "0.3.0";
 
 const RETRY_STATUS_CODES = new Set([429, 500, 502, 503, 504]);
 const NO_RETRY_STATUS_CODES = new Set([400, 401, 403, 404, 422]);
@@ -48,6 +49,7 @@ export class ClickMail {
   readonly campaigns: CampaignsResource;
   readonly contacts: ContactsResource;
   readonly suppressions: SuppressionsResource;
+  readonly inbound: InboundResource;
 
   constructor(config: string | ClickMailConfig) {
     const fetchFn = (url: string | URL | Request, init?: RequestInit) =>
@@ -78,12 +80,17 @@ export class ClickMail {
     this.campaigns = new CampaignsResource(this);
     this.contacts = new ContactsResource(this);
     this.suppressions = new SuppressionsResource(this);
+    this.inbound = new InboundResource(this);
   }
 
   async request<T>(opts: InternalRequestOptions): Promise<T> {
     const url = this.buildUrl(opts.path, opts.query);
     const headers = this.buildHeaders(opts.idempotencyKey);
     const body = opts.body !== undefined ? JSON.stringify(opts.body) : undefined;
+
+    // A POST is only safe to repeat when the server can de-duplicate it;
+    // otherwise a 5xx/timeout after the server acted could send twice.
+    const canRetry = opts.method !== "POST" || opts.idempotencyKey !== undefined;
 
     let lastError: unknown;
 
@@ -120,6 +127,10 @@ export class ClickMail {
           if (!RETRY_STATUS_CODES.has(err.statusCode) || attempt >= this.retries) {
             throw err;
           }
+          // 429 is always safe: the request was rejected before being processed.
+          if (err.statusCode !== 429 && !canRetry) {
+            throw err;
+          }
           lastError = err;
           continue;
         }
@@ -133,7 +144,7 @@ export class ClickMail {
             408,
             "TIMEOUT"
           );
-          if (attempt >= this.retries) throw lastError;
+          if (attempt >= this.retries || !canRetry) throw lastError;
           continue;
         }
 

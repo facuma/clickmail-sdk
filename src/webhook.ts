@@ -2,16 +2,56 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { ClickMailError } from "./errors.js";
 import type { WebhookEventPayload } from "../types/webhooks.js";
 
-export type { WebhookEventPayload, WebhookEventType } from "../types/webhooks.js";
+// Re-exported so webhook handlers can catch what constructWebhookEvent throws.
+export { ClickMailError } from "./errors.js";
+
+export type {
+  WebhookEventPayload,
+  WebhookEventType,
+  EmailWebhookEvent,
+  EmailReceivedWebhookEvent,
+  EmailEventData,
+  EmailReceivedData,
+} from "../types/webhooks.js";
+
+/** Request headers as Node (`IncomingHttpHeaders`) or fetch (`Headers`) expose them. */
+export type WebhookHeaders = Headers | Record<string, string | string[] | undefined>;
 
 export interface VerifyWebhookOptions {
+  /** The raw request body, exactly as received (never re-serialized JSON). */
   payload: string | Buffer | Uint8Array;
-  signature: string;
+  /** `X-Webhook-Signature`. Optional when `headers` is given. */
+  signature?: string;
   secret: string;
+  /** Request headers; `X-Webhook-Signature` and `X-Webhook-Timestamp` are read from them. */
+  headers?: WebhookHeaders;
+  /**
+   * Reject events whose timestamp is further than this many seconds from now.
+   * Off by default. Retries keep the original timestamp and span ~2 hours, so
+   * use a window that covers them (e.g. `3 * 60 * 60`) or de-duplicate on the
+   * event `id` instead.
+   */
+  toleranceSeconds?: number;
+}
+
+function readHeader(headers: WebhookHeaders | undefined, name: string): string | undefined {
+  if (!headers) return undefined;
+  if (typeof (headers as Headers).get === "function") {
+    return (headers as Headers).get(name) ?? undefined;
+  }
+  const record = headers as Record<string, string | string[] | undefined>;
+  const key = Object.keys(record).find((k) => k.toLowerCase() === name);
+  const value = key !== undefined ? record[key] : undefined;
+  return Array.isArray(value) ? value[0] : value;
 }
 
 export function verifyWebhookSignature(opts: VerifyWebhookOptions): boolean {
-  const { payload, signature, secret } = opts;
+  const { payload, secret } = opts;
+  const signature = opts.signature ?? readHeader(opts.headers, "x-webhook-signature");
+
+  if (!signature || !secret) {
+    return false;
+  }
 
   try {
     const payloadBuffer =
@@ -53,8 +93,9 @@ export function constructWebhookEvent(opts: VerifyWebhookOptions): WebhookEventP
       ? opts.payload
       : Buffer.from(opts.payload).toString("utf8");
 
+  let event: WebhookEventPayload;
   try {
-    return JSON.parse(payloadString) as WebhookEventPayload;
+    event = JSON.parse(payloadString) as WebhookEventPayload;
   } catch {
     throw new ClickMailError(
       "Webhook payload is not valid JSON.",
@@ -62,4 +103,19 @@ export function constructWebhookEvent(opts: VerifyWebhookOptions): WebhookEventP
       "INVALID_WEBHOOK_PAYLOAD"
     );
   }
+
+  if (opts.toleranceSeconds !== undefined) {
+    // The timestamp is part of the signed body; the header mirrors it.
+    const raw = readHeader(opts.headers, "x-webhook-timestamp") ?? event.timestamp;
+    const ts = Date.parse(raw);
+    if (Number.isNaN(ts) || Math.abs(Date.now() - ts) > opts.toleranceSeconds * 1000) {
+      throw new ClickMailError(
+        "Webhook timestamp is missing or outside the tolerance window.",
+        400,
+        "INVALID_WEBHOOK_TIMESTAMP"
+      );
+    }
+  }
+
+  return event;
 }

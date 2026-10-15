@@ -13,15 +13,14 @@ const server = createServer(async (req, res) => {
   }
   const rawBody = Buffer.concat(chunks);
 
-  const signature = req.headers["x-webhook-signature"] as string;
-
   try {
     const event = constructWebhookEvent({
       payload: rawBody,
-      signature,
+      headers: req.headers, // lee X-Webhook-Signature
       secret: process.env.CLICKMAIL_WEBHOOK_SECRET!,
     });
 
+    // La entrega es at-least-once: deduplicá por event.id (no cambia entre reintentos).
     switch (event.type) {
       case "email.delivered":
         console.log("Email entregado:", event.data.email_id);
@@ -31,6 +30,13 @@ const server = createServer(async (req, res) => {
         break;
       case "email.complained":
         console.log("Queja recibida para:", event.data.recipients);
+        break;
+      case "email.received":
+        console.log(`Mail recibido de ${event.data.from.email}: ${event.data.subject}`);
+        for (const att of event.data.attachments) {
+          // download_url requiere una API key con inbound:read
+          console.log("Adjunto:", att.filename, att.stored ? att.download_url : "(no guardado)");
+        }
         break;
       default:
         console.log("Evento:", event.type);

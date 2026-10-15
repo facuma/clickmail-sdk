@@ -7,6 +7,7 @@ import type {
 } from "../../types/emails.js";
 import type { PaginatedResponse } from "../../types/common.js";
 import { ValidationError } from "../errors.js";
+import { generateIdempotencyKey } from "../idempotency.js";
 
 export class EmailsResource {
   constructor(private readonly client: ClickMail) {}
@@ -20,7 +21,8 @@ export class EmailsResource {
       method: "POST",
       path: "/v1/emails",
       body,
-      ...(idempotencyKey !== undefined ? { idempotencyKey } : {}),
+      // Always sent so automatic retries can never send the email twice.
+      idempotencyKey: idempotencyKey ?? generateIdempotencyKey(),
     });
   }
 
