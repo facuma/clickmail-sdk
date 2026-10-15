@@ -20,6 +20,12 @@ export type ErrorCode =
   | "SENDER_NOT_ALLOWED"
   | "TEMPLATE_NOT_FOUND"
   | "VALIDATION_ERROR"
+  | "SENDER_DISABLED"
+  | "ATTACHMENT_TYPE_NOT_ALLOWED"
+  | "ATTACHMENTS_TOO_LARGE"
+  | "EMAIL_NOT_FOUND"
+  | "EMAIL_NOT_SENT_YET"
+  | "HOST_NOT_INBOUND_ENABLED"
   | (string & Record<never, never>);
 
 export interface ApiErrorBody {

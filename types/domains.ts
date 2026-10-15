@@ -24,3 +24,12 @@ export interface Domain {
 export interface CreateDomainPayload {
   domain: string;
 }
+
+export interface DomainInboundStatus {
+  id: string;
+  domain: string;
+  inboundEnabled: boolean;
+  inboundEnabledAt?: string | null;
+  /** MX record to publish so mail for the domain reaches ClickMail (on enable). */
+  mxRecord?: { type: "MX"; priority: number; value: string };
+}

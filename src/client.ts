@@ -12,7 +12,7 @@ import { InboundResource } from "./resources/inbound.js";
 const DEFAULT_BASE_URL = "https://resendapi.cubells.com.ar";
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_RETRIES = 2;
-const SDK_VERSION = "0.3.1";
+const SDK_VERSION = "0.4.0";
 
 const RETRY_STATUS_CODES = new Set([429, 500, 502, 503, 504]);
 const NO_RETRY_STATUS_CODES = new Set([400, 401, 403, 404, 422]);

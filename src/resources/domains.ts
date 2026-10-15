@@ -1,5 +1,5 @@
 import type { ClickMail } from "../client.js";
-import type { Domain, CreateDomainPayload } from "../../types/domains.js";
+import type { Domain, CreateDomainPayload, DomainInboundStatus } from "../../types/domains.js";
 
 export class DomainsResource {
   constructor(private readonly client: ClickMail) {}
@@ -30,6 +30,22 @@ export class DomainsResource {
     return this.client.request<Domain>({
       method: "POST",
       path: `/v1/domains/${id}/check`,
+    });
+  }
+
+  /** Enables receiving email for a verified domain. Requires the `inbound:write` scope. */
+  async enableInbound(id: string): Promise<DomainInboundStatus> {
+    return this.client.request<DomainInboundStatus>({
+      method: "POST",
+      path: `/v1/domains/${id}/inbound/enable`,
+    });
+  }
+
+  /** Stops receiving email for the domain. Requires the `inbound:write` scope. */
+  async disableInbound(id: string): Promise<DomainInboundStatus> {
+    return this.client.request<DomainInboundStatus>({
+      method: "POST",
+      path: `/v1/domains/${id}/inbound/disable`,
     });
   }
 }

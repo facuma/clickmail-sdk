@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-10-15
+
+### Added
+
+- `client.inbound.addresses`: `list`, `get`, `create`, `update`, `disable` and `delete`
+  receiving addresses (scopes `inbound:read` / `inbound:write`).
+- `client.domains.enableInbound(id)` / `disableInbound(id)`.
+- `client.senders.update(id, { active, name })`, plus `disable(id)` / `enable(id)`.
+  Sending from a disabled sender fails with code `SENDER_DISABLED` (403). There is no
+  sender delete: an unregistered address on a verified domain can send.
+- `attachments` on `emails.send` and `inbound.reply` (`Buffer`/`Uint8Array` or base64;
+  up to 10 files, ~28 MB). `contentId` embeds inline images.
+- Threading on `emails.send`: `inReplyToEmailId` (an email sent through ClickMail),
+  `inReplyTo` and `references`.
+- `inbound.reply` accepts `replyAll`, `cc` and `bcc`.
+- `Email.messageIdHeader` and `Email.attachments`; `message_id` on `email.sent`;
+  `in_reply_to_email_id` on `email.received` and `InboundEmail.inReplyToEmailId`.
+- New `ErrorCode` values: `SENDER_DISABLED`, `ATTACHMENT_TYPE_NOT_ALLOWED`,
+  `ATTACHMENTS_TOO_LARGE`, `EMAIL_NOT_FOUND`, `EMAIL_NOT_SENT_YET`,
+  `HOST_NOT_INBOUND_ENABLED`.
+
 ## [0.3.1] - 2026-10-15
 
 ### Fixed

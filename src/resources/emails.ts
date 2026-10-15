@@ -8,6 +8,7 @@ import type {
 import type { PaginatedResponse } from "../../types/common.js";
 import { ValidationError } from "../errors.js";
 import { generateIdempotencyKey } from "../idempotency.js";
+import { serializeAttachments } from "../attachments.js";
 
 export class EmailsResource {
   constructor(private readonly client: ClickMail) {}
@@ -15,7 +16,9 @@ export class EmailsResource {
   async send(payload: SendEmailPayload): Promise<SendEmailResponse> {
     this.validate(payload);
 
-    const { idempotencyKey, ...body } = payload;
+    const { idempotencyKey, attachments, ...rest } = payload;
+    const serialized = serializeAttachments(attachments);
+    const body = serialized ? { ...rest, attachments: serialized } : rest;
 
     return this.client.request<SendEmailResponse>({
       method: "POST",

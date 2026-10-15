@@ -119,6 +119,48 @@ await client.emails.send({
 });
 ```
 
+### With attachments
+
+```typescript
+import { readFile } from "node:fs/promises";
+
+await client.emails.send({
+  from: "Tesorería <tesoreria@yourdomain.com>",
+  to: ["proveedor@example.com"],
+  subject: "Comprobante de pago",
+  html: '<p>Adjunto el comprobante.</p><img src="cid:logo">',
+  attachments: [
+    { filename: "comprobante.pdf", content: await readFile("./comprobante.pdf") },
+    { filename: "logo.png", content: await readFile("./logo.png"), contentId: "logo" },
+  ],
+});
+```
+
+`content` takes a `Buffer`/`Uint8Array` or a base64 string. Up to 10 files and ~28 MB in
+total; executable types SES refuses (`.exe`, `.bat`, `.js`…) are rejected with
+`ATTACHMENT_TYPE_NOT_ALLOWED`.
+
+### Threading (replying to an email you sent)
+
+```typescript
+const first = await client.emails.send({ /* … */ });
+
+// Later, in the same thread:
+await client.emails.send({
+  from: "tesoreria@yourdomain.com",
+  to: ["proveedor@example.com"],
+  subject: "Re: Comprobante de pago",
+  text: "Te reenvío la versión corregida.",
+  inReplyToEmailId: first.id, // or inReplyTo: "<message-id@…>"
+});
+
+// The sent email's RFC Message-ID (available once sent):
+const { messageIdHeader } = await client.emails.get(first.id);
+```
+
+Inbound emails that reply to one of your sends carry its id in `inReplyToEmailId`
+(`in_reply_to_email_id` in the `email.received` webhook).
+
 ### Retrieve and list emails
 
 ```typescript
@@ -150,8 +192,12 @@ console.log(checked.dkimRecords); // DNS records to add
 ## Senders
 
 ```typescript
-await client.senders.create({ email: "hello@yourdomain.com", name: "My App" });
+const sender = await client.senders.create({ email: "hello@yourdomain.com", name: "My App" });
 const senders = await client.senders.list();
+
+// Revoke: sends, replies and campaigns from it fail with SENDER_DISABLED
+await client.senders.disable(sender.id);
+await client.senders.enable(sender.id);
 ```
 
 ---
@@ -243,7 +289,26 @@ const raw = await client.inbound.getRaw(email.id);
 await client.inbound.reply(email.id, {
   from: "Support <support@yourdomain.com>",
   text: "Thanks, we are on it.",
+  replyAll: true,                 // also the original To/Cc (minus your own addresses)
+  bcc: ["archive@yourdomain.com"],
+  attachments: [{ filename: "receipt.pdf", content: pdfBuffer }],
 });
+```
+
+### Receiving addresses
+
+```typescript
+// Once per domain (the response includes the MX record to publish)
+await client.domains.enableInbound(domainId);
+
+const address = await client.inbound.addresses.create({
+  localPart: "mandato-42",
+  host: "inbound.yourdomain.com",
+  forwardWebhookUrl: "https://yourapp.com/webhooks/inbound", // optional
+});
+
+await client.inbound.addresses.list({ active: true });
+await client.inbound.addresses.disable(address.id); // stop receiving, keep history
 ```
 
 ---

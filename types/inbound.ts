@@ -1,4 +1,5 @@
 import type { PaginationParams } from "./common.js";
+import type { EmailAttachmentInput } from "./emails.js";
 
 export interface InboundAddressRef {
   email: string;
@@ -62,8 +63,15 @@ export interface InboundEmailSummary {
   attachmentsCount: number;
 }
 
+export interface InboundEmailThreadInfo {
+  /** Id of the email you sent through ClickMail that this one replies to, if any. */
+  inReplyToEmailId: string | null;
+}
+
 /** Inbound email as returned by `inbound.get`. */
-export interface InboundEmail extends Omit<InboundEmailSummary, "attachmentsCount"> {
+export interface InboundEmail
+  extends Omit<InboundEmailSummary, "attachmentsCount">,
+    InboundEmailThreadInfo {
   sesMessageId: string;
   messageIdHeader: string | null;
   replyToEmails: string[] | null;
@@ -108,4 +116,62 @@ export interface ReplyInboundPayload {
   subject?: string;
   html?: string;
   text?: string;
+  /** Also copy the original To/Cc, minus your own inbound addresses and the sender. */
+  replyAll?: boolean;
+  cc?: string[];
+  bcc?: string[];
+  attachments?: EmailAttachmentInput[];
+}
+
+// ---------------------------------------------------------------------------
+// Inbound addresses (mailboxes + routing rules)
+// ---------------------------------------------------------------------------
+
+export interface InboundAddress {
+  id: string;
+  projectId: string;
+  domainId: string;
+  /** Full lowercase address; `*@host` for a catch-all. */
+  address: string;
+  localPart: string;
+  host: string;
+  name: string | null;
+  isCatchAll: boolean;
+  /** Inactive addresses drop incoming mail. */
+  active: boolean;
+  deliverToInbox: boolean;
+  forwardWebhookUrl: string | null;
+  /** Signing secret of `forwardWebhookUrl` deliveries. */
+  forwardWebhookSecret: string | null;
+  forwardEmail: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateInboundAddressPayload {
+  /** Mailbox local part (`soporte`), or `*` for a catch-all. */
+  localPart: string;
+  /** Recipient host, covered by an inbound-enabled domain of the project. */
+  host: string;
+  name?: string;
+  isCatchAll?: boolean;
+  active?: boolean;
+  deliverToInbox?: boolean;
+  forwardWebhookUrl?: string;
+  forwardEmail?: string;
+}
+
+export interface UpdateInboundAddressPayload {
+  name?: string;
+  active?: boolean;
+  deliverToInbox?: boolean;
+  forwardWebhookUrl?: string;
+  clearForwardWebhook?: boolean;
+  forwardEmail?: string;
+  clearForwardEmail?: boolean;
+}
+
+export interface ListInboundAddressesParams {
+  active?: boolean;
+  host?: string;
 }

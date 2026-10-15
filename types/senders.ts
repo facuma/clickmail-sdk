@@ -14,3 +14,13 @@ export interface CreateSenderPayload {
   email: string;
   name?: string;
 }
+
+export interface UpdateSenderPayload {
+  name?: string;
+  /**
+   * `false` disables the sender: emails, replies and campaigns from it are
+   * rejected with `SENDER_DISABLED`. There is no delete on purpose — an
+   * unregistered address on a verified domain can send.
+   */
+  active?: boolean;
+}

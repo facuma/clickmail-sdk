@@ -53,6 +53,8 @@ export interface UpdateWebhookPayload {
 export interface EmailEventData {
   email_id: string;
   ses_message_id?: string;
+  /** RFC 5322 Message-ID of the sent email (on `email.sent`). */
+  message_id?: string;
   status: string;
   recipients?: string[];
   /** Bounce sub-type, complaint type or send error, when relevant. */
@@ -83,6 +85,8 @@ export interface EmailReceivedData {
   dkim_verdict: string | null;
   dmarc_verdict: string | null;
   attachments: InboundAttachmentRef[];
+  /** Id of the email you sent through ClickMail that this one replies to, if any. */
+  in_reply_to_email_id: string | null;
 }
 
 interface WebhookEventBase<T extends string, D> {

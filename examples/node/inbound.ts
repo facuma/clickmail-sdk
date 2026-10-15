@@ -4,6 +4,13 @@ import { ClickMail } from "@clickmail/sdk";
 const client = new ClickMail(process.env.CLICKMAIL_API_KEY!);
 
 async function main() {
+  // Alta de una dirección de recepción (por ejemplo, al empezar un mandato)
+  const address = await client.inbound.addresses.create({
+    localPart: "mandato-42",
+    host: "inbound.tudominio.com",
+  });
+  console.log("Recibiendo en:", address.address);
+
   const { data } = await client.inbound.list({ status: "PROCESSED", limit: 10 });
   const first = data[0];
   if (!first) {
@@ -23,6 +30,8 @@ async function main() {
   const reply = await client.inbound.reply(email.id, {
     from: "Soporte <soporte@tudominio.com>",
     text: "¡Gracias! Ya lo estamos revisando.",
+    replyAll: true,
+    attachments: [{ filename: "recibo.txt", content: Buffer.from("Recibo #42") }],
   });
   console.log("Respuesta encolada:", reply.id);
 
@@ -32,6 +41,12 @@ async function main() {
     console.log(`${d.eventType} → ${d.url}: ${d.lastError}`);
     await client.webhooks.deliveries.redeliver(d.id);
   }
+}
+
+// Baja al terminar el mandato: deja de recibir pero conserva el historial
+export async function closeMandate(addressId: string, senderId: string) {
+  await client.inbound.addresses.disable(addressId);
+  await client.senders.disable(senderId);
 }
 
 main().catch((err) => {
